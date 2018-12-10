@@ -13,6 +13,18 @@ defmodule Ring do
     end
   end
 
+  def insert_many(ring, current, value) do
+    {ring, next} = Enum.flat_map_reduce(ring, :no, fn x, found ->
+      IO.inspect({x, found})
+      case {x, found} do
+        {^current, _} -> {[x], value}
+        {_, :no} -> {[x], :no}
+        {_, val} -> {[x, val], val + 1}
+      end
+    end)
+    {ring, next - 1}
+  end
+
   def collect(ring, current) do
     idx_to_remove = find_index(ring, current) - 7
     idx_to_remove = cond do
@@ -62,7 +74,10 @@ defmodule Day9 do
       rem(turn, 1000) == 0 -> IO.inspect(turn)
       true -> true
     end
-    circle = Ring.insert_one_after(circle, current, turn)
+
+    next_multiple = 23 * (1 + trunc(Float.floor(turn / 23)))
+    skippable = next_multiple - turn
+    {circle, turn} = Ring.insert_many(circle, current, turn)
     play({turn + 1, max, turn, circle, players})
   end
 end
@@ -76,13 +91,16 @@ defmodule Tests do
   import Ring
 
   test "part1" do
+    assert Ring.insert_many([0,8,4,2,5,1,6,3,7], 8, 9) == {[
+      0, 8, 4, 9, 2, 10, 5, 11, 1, 12, 6, 13, 3, 14, 7, 15
+    ]
     assert part1(9, 25) == 32
-    IO.inspect({"Part 1", part1(486, 70833)})
+    # IO.inspect({"Part 1", part1(486, 70833)})
   end
 
-  test "ring" do
-    assert insert_one_after([0], 0, 1) == [0,1]
-    assert insert_one_after([0,1], 1, 2) == [0,2,1]
-    assert insert_one_after([0,2,1], 2, 3) == [0,2,1,3]
-  end
+  # test "ring" do
+  #   assert insert_one_after([0], 0, 1) == [0,1]
+  #   assert insert_one_after([0,1], 1, 2) == [0,2,1]
+  #   assert insert_one_after([0,2,1], 2, 3) == [0,2,1,3]
+  # end
 end
