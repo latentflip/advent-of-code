@@ -1,69 +1,66 @@
 defmodule Ring do
-  def find_index(ring, item) do
-    Enum.find_index(ring, fn x -> x == item end)
+  def play_one({next_marble, ring}) do
+    ring = ring |> advance
+
+    ring = case ring do
+      {ls, [r]} -> {[r|ls], [next_marble]}
+      {ls, [r|rs]} -> {[r|ls], [next_marble|rs]}
+    end
+    {next_marble + 1, ring}
   end
 
-  def insert_one_after(ring, from, value) do
-    idx = find_index(ring, from)
-    insert_idx = rem(idx + 2, length(ring))
-
-    cond do
-      insert_idx == 0 -> ring ++ [value]
-      true -> List.insert_at(ring, insert_idx, value)
-    end
+  # only one
+  def advance({ls, [n]}) do
+    {[], Enum.reverse([n|ls])}
   end
 
-  def collect(ring, current) do
-    idx_to_remove = find_index(ring, current) - 7
-    idx_to_remove = cond do
-      idx_to_remove < 0 -> length(ring) + idx_to_remove
-      true -> idx_to_remove
-    end
-    collected = Enum.at(ring, idx_to_remove)
-    ring = List.delete_at(ring, idx_to_remove)
-    new_index = rem(idx_to_remove, length(ring))
-    current = Enum.at(ring, new_index)
-    IO.inspect({current, collected})
-    {ring, collected, current}
+  def advance({ls, [n|rs]}) do
+    {[n|ls], rs}
+  end
+
+  def reverse7(board) do
+    board |> reverse |> reverse |> reverse |> reverse |> reverse |> reverse |> reverse
+  end
+
+  def reverse({[l|ls], rs}) do
+    {ls, [l|rs]}
+  end
+
+  def reverse({[], rs}) do
+    [r|ls] = Enum.reverse(rs)
+    {ls, [r]}
+  end
+
+  def remove_current({ls, [r|rs]}) do
+    {r, {ls, rs}}
   end
 end
+
 
 defmodule Day9 do
   def part1(players, max) do
     players = Range.new(0, players - 1) |> Enum.map(fn x -> {x, 0} end)
-    turn = 0
-    circle = []
-    players = play({turn, max, 0, circle, players})
-
-    players
+    board = {1, {[], [0]}}
+    play(board, players, max)
     |> Enum.max_by(fn {n, score} -> score end)
     |> elem(1)
   end
 
-  def play({turn, max, _, _, players}) when turn > max do
+  def play({next_val,board}, players, max) when next_val == max do
     players
   end
 
-  # first move
-  def play({turn, max, current, [], players}) do
-    play({turn + 1, max, current, [turn], players})
+  def play({next_val,board}, players, max) when rem(next_val, 23) == 0 do
+    board = Ring.reverse7(board)
+    {collected, board} = Ring.remove_current(board)
+    player_idx = rem(next_val, length(players))
+    players = List.update_at(players, player_idx, fn {n, score} -> {n, score + next_val + collected } end)
+    play({next_val + 1, board}, players, max)
   end
 
-  def play({turn, max, current, circle, players}) when rem(turn, 23) == 0 do
-    player_idx = rem(turn, length(players))
-    {circle, collected, current} = Ring.collect(circle, current)
-    players = List.update_at(players, player_idx, fn {n, score} -> {n, score + turn + collected } end)
-    IO.inspect(players)
-    play({turn + 1, max, current, circle, players})
-  end
-
-  def play({turn, max, current, circle, players}) do
-    cond do
-      rem(turn, 1000) == 0 -> IO.inspect(turn)
-      true -> true
-    end
-    circle = Ring.insert_one_after(circle, current, turn)
-    play({turn + 1, max, turn, circle, players})
+  def play(board, players, max) do
+    Ring.play_one(board)
+      |> play(players, max)
   end
 end
 
@@ -76,13 +73,41 @@ defmodule Tests do
   import Ring
 
   test "part1" do
-    assert part1(9, 25) == 32
-    IO.inspect({"Part 1", part1(486, 70833)})
-  end
+    assert advance({[], [0]}) == {[], [0]}
 
-  test "ring" do
-    assert insert_one_after([0], 0, 1) == [0,1]
-    assert insert_one_after([0,1], 1, 2) == [0,2,1]
-    assert insert_one_after([0,2,1], 2, 3) == [0,2,1,3]
+    x = {[], [0,1,2]} |> advance
+    assert x == {[0], [1,2]}
+    x = advance(x)
+    assert x == {[1,0], [2]}
+    x = advance(x)
+    assert x == {[], [0,1,2]}
+
+    y = {1, {[], [0]}}
+    y = play_one(y)
+    assert y == {2, {[0], [1]}}
+    y = play_one(y)
+    assert y == {3, {[0], [2,1]}}
+
+    # -3 -2 -1 0 1 2 3
+    x = {[], [-3, -2, -1, 0, 1, 2, 3]}
+    x = x |> advance |> advance |> advance
+    assert x == {[-1, -2, -3], [0, 1, 2, 3]}
+
+    x = x |> reverse
+    assert x == {[-2, -3], [-1, 0, 1, 2, 3]}
+
+    x = x |> reverse
+    assert x == {[-3], [-2,-1, 0, 1, 2, 3]}
+
+    x = x |> reverse
+    assert x == {[], [-3, -2,-1, 0, 1, 2, 3]}
+
+    x = x |> reverse
+    assert x == {[2, 1, 0, -1, -2, -3], [3]}
+
+    assert part1(9, 25) == 32
+    assert part1(10, 1618) == 8317
+    assert part1(486, 70833) == 373597
+    IO.inspect(part1(486, 7083300))
   end
 end
